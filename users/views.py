@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User
 from django.contrib import messages
 from .forms import UserRegistrationForm, UserProfileForm
-from .models import Utilisateur, Patient, Kine, Vendeur
+from .models import Utilisateur, Patient, Kine, Vendeur, Settings
 from django.views.generic import View
 from appointments.models import Appointment
 from django.db import models
@@ -196,10 +196,49 @@ def admin_reports(request):
 @user_passes_test(is_admin)
 def admin_settings(request):
     if request.method == 'POST':
-        # Gérer les paramètres ici
-        messages.success(request, 'Paramètres mis à jour avec succès')
+        # Récupérer les données du formulaire
+        site_name = request.POST.get('site_name')
+        contact_email = request.POST.get('contact_email')
+        phone_number = request.POST.get('phone_number')
+        address = request.POST.get('address')
+        
+        # Paramètres de notification
+        email_notifications = request.POST.get('email_notifications') == 'on'
+        sms_notifications = request.POST.get('sms_notifications') == 'on'
+        appointment_reminders = request.POST.get('appointment_reminders') == 'on'
+        
+        # Paramètres de sécurité
+        session_timeout = int(request.POST.get('session_timeout', 30))
+        two_factor_auth = request.POST.get('two_factor_auth') == 'on'
+        password_policy = request.POST.get('password_policy') == 'on'
+        
+        # Mettre à jour ou créer les paramètres
+        settings, created = Settings.objects.get_or_create(pk=1)
+        settings.site_name = site_name
+        settings.contact_email = contact_email
+        settings.phone_number = phone_number
+        settings.address = address
+        settings.email_notifications = email_notifications
+        settings.sms_notifications = sms_notifications
+        settings.appointment_reminders = appointment_reminders
+        settings.session_timeout = session_timeout
+        settings.two_factor_auth = two_factor_auth
+        settings.password_policy = password_policy
+        settings.save()
+        
+        messages.success(request, 'Les paramètres ont été mis à jour avec succès.')
         return redirect('admin_settings')
-    return render(request, 'admin/settings.html')
+    
+    # Charger les paramètres actuels
+    try:
+        settings = Settings.objects.get(pk=1)
+    except Settings.DoesNotExist:
+        settings = Settings.objects.create(pk=1)
+    
+    context = {
+        'settings': settings
+    }
+    return render(request, 'users/admin_settings.html', context)
 
 @login_required
 def patient_detail(request, pk):
