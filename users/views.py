@@ -165,3 +165,36 @@ def patient_detail(request, pk):
         'appointments': appointments
     }
     return render(request, 'users/patient_detail.html', context)
+
+@login_required
+@user_passes_test(is_admin)
+def user_profile(request, pk):
+    user = get_object_or_404(Utilisateur, pk=pk)
+    context = {
+        'user': user,
+    }
+    
+    if hasattr(user, 'patient_profile'):
+        context['profile'] = user.patient_profile
+    elif hasattr(user, 'kine_profile'):
+        context['profile'] = user.kine_profile
+    elif hasattr(user, 'vendeur_profile'):
+        context['profile'] = user.vendeur_profile
+    
+    return render(request, 'users/admin_profile.html', context)
+
+@login_required
+@user_passes_test(is_admin)
+def edit_user_profile(request, pk):
+    user = get_object_or_404(Utilisateur, pk=pk)
+    
+    if request.method == 'POST':
+        form = UserProfileForm(request.POST, instance=user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Le profil a été mis à jour avec succès !')
+            return redirect('users:user_profile', pk=user.pk)
+    else:
+        form = UserProfileForm(instance=user)
+
+    return render(request, 'users/admin_edit_profile.html', {'form': form, 'user': user})
