@@ -126,13 +126,69 @@ def admin_appointments(request):
 def admin_reports(request):
     # Statistiques pour les rapports
     appointments_by_status = Appointment.objects.values('statut').annotate(count=models.Count('id'))
+    
+    # Rendez-vous par mois
     appointments_by_month = Appointment.objects.extra(
-        select={'month': "strftime('%m', date_heure)"}
-    ).values('month').annotate(count=models.Count('id'))
+        select={'month': "strftime('%m/%Y', date_heure)"}
+    ).values('month').annotate(count=models.Count('id')).order_by('month')
+    
+    # Statistiques du mois en cours
+    current_month = timezone.now().strftime('%m/%Y')
+    monthly_appointments = Appointment.objects.filter(
+        date_heure__month=timezone.now().month,
+        date_heure__year=timezone.now().year
+    ).count()
+    
+    # Taux de complétion
+    total_appointments = Appointment.objects.count()
+    completed_appointments = Appointment.objects.filter(statut='COMPLETED').count()
+    completion_rate = round((completed_appointments / total_appointments * 100) if total_appointments > 0 else 0, 1)
+    
+    # Nouveaux patients ce mois-ci
+    new_patients = Patient.objects.filter(
+        utilisateur__date_joined__month=timezone.now().month,
+        utilisateur__date_joined__year=timezone.now().year
+    ).count()
+    
+    # Taux d'annulation
+    cancelled_appointments = Appointment.objects.filter(statut='CANCELLED').count()
+    cancellation_rate = round((cancelled_appointments / total_appointments * 100) if total_appointments > 0 else 0, 1)
+    
+    # Statistiques mensuelles détaillées
+    monthly_stats = []
+    for i in range(6):  # Derniers 6 mois
+        month = timezone.now() - timezone.timedelta(days=30*i)
+        month_str = month.strftime('%m/%Y')
+        
+        month_appointments = Appointment.objects.filter(
+            date_heure__month=month.month,
+            date_heure__year=month.year
+        )
+        
+        total = month_appointments.count()
+        confirmed = month_appointments.filter(statut='CONFIRMED').count()
+        completed = month_appointments.filter(statut='COMPLETED').count()
+        cancelled = month_appointments.filter(statut='CANCELLED').count()
+        
+        completion_rate = round((completed / total * 100) if total > 0 else 0, 1)
+        
+        monthly_stats.append({
+            'month': month_str,
+            'total': total,
+            'confirmed': confirmed,
+            'completed': completed,
+            'cancelled': cancelled,
+            'completion_rate': completion_rate
+        })
     
     context = {
         'appointments_by_status': appointments_by_status,
         'appointments_by_month': appointments_by_month,
+        'monthly_appointments': monthly_appointments,
+        'completion_rate': completion_rate,
+        'new_patients': new_patients,
+        'cancellation_rate': cancellation_rate,
+        'monthly_stats': monthly_stats,
     }
     return render(request, 'admin/reports.html', context)
 
